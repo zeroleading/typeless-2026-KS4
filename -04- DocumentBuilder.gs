@@ -173,7 +173,7 @@ const DocumentBuilder = {
         // Because these replacements are scoped to 'newRow', they execute extremely quickly
         newRow.replaceText('{{subjectName}}', subj.subjectName || '');
         newRow.replaceText('{{teacher}}', subj.teacher || '');
-        newRow.replaceText('{{tg}}', subj.tg || '');
+        newRow.replaceText('{{stg}}', subj.stg || '');
         newRow.replaceText('{{crnt}}', subj.crnt || '');
         newRow.replaceText('{{ci1}}', subj.ci1 || '');
         newRow.replaceText('{{ci2}}', subj.ci2 || '');

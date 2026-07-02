@@ -57,7 +57,7 @@ const CONFIG = Object.freeze({
     tut_pshe: 'pshe engagement',
     subj_adno: 'adno',
     subj_teacher: 'teacher',
-    subj_tg: 'tg',
+    subj_stg: 'stg',
     subj_crnt: 'crnt',
     subj_ci1: 'ci1',
     subj_ci2: 'ci2',
