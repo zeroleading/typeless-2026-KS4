@@ -41,6 +41,9 @@
       .btn-danger { background-color: #e53e3e; }
       .btn-danger:hover { background-color: #c53030; }
       .btn-danger:disabled { background-color: #fc8181; }
+      .btn-warning { background-color: #ed8936; margin-top: 10px; }
+      .btn-warning:hover { background-color: #dd6b20; }
+      .btn-warning:disabled { background-color: #fbd38d; }
       
       /* Progress Bar Styling */
       .progress-container {
@@ -130,14 +133,15 @@
     
     <div id="step-start">
       <p>Click below to begin the generation process. The system will first audit the data for any missing entries.</p>
-      <button class="btn" id="startBtn" onclick="initBatch(false)">Start Pre-Flight Audit</button>
+      <button class="btn" id="startBtn" onclick="initBatch(null)">Start Pre-Flight Audit</button>
       <div id="startStatus" class="status-msg"></div>
     </div>
     
     <div id="step-audit" style="display: none;">
-      <p><strong>⚠️ Missing Data Detected</strong><br>The following students are missing data required for this report. Generating now will leave these fields blank.</p>
+      <p><strong>⚠️ Missing Data Detected</strong><br>The following students are missing data required for this report.</p>
       <div class="audit-box" id="auditList"></div>
-      <button class="btn btn-danger" id="forceBtn" onclick="initBatch(true)">Ignore Warnings & Generate Anyway</button>
+      <button class="btn btn-danger" id="forceBtn" onclick="initBatch('ignore')">Proceed with Blanks</button>
+      <button class="btn btn-warning" id="dropBtn" onclick="initBatch('drop')">Drop Incomplete Subjects</button>
       <div id="auditStatus" class="status-msg"></div>
     </div>
     
@@ -165,6 +169,7 @@
       let batchFolderId = '';
       let totalStudents = 0;
       let currentIndex = 0;
+      let globalAuditAction = null; // Store the user's choice to pass to chunks
 
       function switchView(stepId) {
         document.getElementById('step-start').style.display = 'none';
@@ -174,10 +179,13 @@
         document.getElementById(stepId).style.display = 'block';
       }
 
-      function initBatch(forceProceed) {
+      function initBatch(auditAction) {
+        globalAuditAction = auditAction;
+        
         // Disable buttons and show loading spinner
-        if (forceProceed) {
+        if (auditAction) {
           document.getElementById('forceBtn').disabled = true;
+          document.getElementById('dropBtn').disabled = true;
           document.getElementById('auditStatus').innerHTML = '<span class="processing-text"><div class="spinner"></div> Preparing batch folder...</span>';
         } else {
           document.getElementById('startBtn').disabled = true;
@@ -197,7 +205,7 @@
               response.issues.forEach(i => html += '<li>' + i + '</li>');
               html += '</ul>';
               document.getElementById('auditList').innerHTML = html;
-              document.getElementById('startStatus').innerHTML = ''; // Clear start text
+              document.getElementById('startStatus').innerHTML = ''; 
               switchView('step-audit');
             } else if (response.status === 'ready') {
               batchFolderId = response.folderId;
@@ -210,15 +218,16 @@
           })
           .withFailureHandler(function(err) {
             const errHtml = '<span style="color:#e53e3e;">System Error: ' + err.message + '</span>';
-            if (forceProceed) {
+            if (auditAction) {
               document.getElementById('auditStatus').innerHTML = errHtml;
               document.getElementById('forceBtn').disabled = false;
+              document.getElementById('dropBtn').disabled = false;
             } else {
               document.getElementById('startStatus').innerHTML = errHtml;
               document.getElementById('startBtn').disabled = false;
             }
           })
-          .server_initBatch(configKey, forceProceed);
+          .server_initBatch(configKey, auditAction);
       }
 
       function processNextChunk() {
@@ -249,7 +258,7 @@
           .withFailureHandler(function(err) {
             document.getElementById('runStatus').innerHTML = '<span style="color:#e53e3e;">Failed at index ' + currentIndex + ': ' + err.message + '<br>Please close and try again.</span>';
           })
-          .server_processChunk(configKey, batchFolderId, currentIndex, chunkSize);
+          .server_processChunk(configKey, batchFolderId, currentIndex, chunkSize, globalAuditAction);
       }
     </script>
   </body>

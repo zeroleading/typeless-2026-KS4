@@ -80,17 +80,18 @@ function showBatchModal(configKey, friendlyName) {
 /**
  * Called by the Modal (Step 1): Prepares the folder and audits the data.
  * @param {string} configKey The report configuration key.
- * @param {boolean} forceProceed Whether to bypass audit warnings.
+ * @param {string|null} auditAction The user's choice ('drop', 'ignore', or null on first run).
  * @returns {Object} Status payload containing issues or folder details.
  */
-function server_initBatch(configKey, forceProceed) {
+function server_initBatch(configKey, auditAction) {
   const reportConfig = CONFIG.REPORTS[configKey];
-  const payload = DataService.buildStudentDataPayload(reportConfig);
+  const payload = DataService.buildStudentDataPayload(reportConfig, auditAction);
 
   if (payload.length === 0) return { error: "No student data found." };
 
   // 1. Audit Check
-  if (!forceProceed) {
+  // We only run the audit interruption if an action hasn't been explicitly selected yet
+  if (!auditAction) {
     const studentsWithIssues = payload.filter(s => s.auditIssues && s.auditIssues.length > 0);
     if (studentsWithIssues.length > 0) {
       const issuesList = studentsWithIssues.map(s => `<b>${s.name}</b>: ${s.auditIssues.join(' | ')}`);
@@ -119,14 +120,15 @@ function server_initBatch(configKey, forceProceed) {
  * @param {string} folderId The Google Drive folder ID to save to.
  * @param {number} startIndex Where to begin slicing the array.
  * @param {number} chunkSize How many students to process in this run.
+ * @param {string|null} auditAction The user's action so the exact same payload is rebuilt.
  * @returns {Object} Success flag.
  */
-function server_processChunk(configKey, folderId, startIndex, chunkSize) {
+function server_processChunk(configKey, folderId, startIndex, chunkSize, auditAction) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const reportConfig = CONFIG.REPORTS[configKey];
   
-  // Re-build payload dynamically (fast and keeps memory lean)
-  const payload = DataService.buildStudentDataPayload(reportConfig);
+  // Re-build payload dynamically (fast and keeps memory lean) using the same filter settings
+  const payload = DataService.buildStudentDataPayload(reportConfig, auditAction);
   
   // Slice out just the 10 students requested
   const chunk = payload.slice(startIndex, startIndex + chunkSize);

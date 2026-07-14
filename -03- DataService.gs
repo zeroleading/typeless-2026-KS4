@@ -5,7 +5,13 @@
 
 const DataService = {
 
-  buildStudentDataPayload: function(reportConfig) {
+  /**
+   * Builds the main payload of student data.
+   * @param {Object} reportConfig The configuration for the current report.
+   * @param {string|null} auditAction The action to take on missing data ('drop', 'ignore', or null).
+   * @returns {Array} An array of processed student objects.
+   */
+  buildStudentDataPayload: function(reportConfig, auditAction) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     
     // 1. Fetch Global Batch Values
@@ -33,15 +39,32 @@ const DataService = {
       }
     });
 
-    // 5. Convert map to array and inject globals
-    return Object.values(studentMap).map(student => ({
-      ...student,
-      yearGroup: yearGroup,
-      collection: collection,
-      academicYear: academicYear,
-      shortName: shortName,
-      until: until
-    }));
+    // 5. Convert map to array, filter based on audit action, and inject globals
+    let payload = Object.values(studentMap).map(student => {
+      let processedSubjects = student.subjects;
+      
+      // If the user requested to drop incomplete subjects, filter them out now
+      if (auditAction === 'drop') {
+        processedSubjects = processedSubjects.filter(subj => !subj.isIncomplete);
+      }
+
+      return {
+        ...student,
+        subjects: processedSubjects,
+        yearGroup: yearGroup,
+        collection: collection,
+        academicYear: academicYear,
+        shortName: shortName,
+        until: until
+      };
+    });
+
+    // 6. If the action was 'drop', remove students who now have zero subjects
+    if (auditAction === 'drop') {
+      payload = payload.filter(student => student.subjects.length > 0);
+    }
+
+    return payload;
   },
 
   _getDynamicFieldMap: function(ss) {
@@ -109,7 +132,7 @@ const DataService = {
           tutor: tutor,
           tutorInfo: {}, 
           subjects: [],
-          auditIssues: [] // <-- NEW: Array to hold our missing data warnings
+          auditIssues: [] 
         };
       }
     });
@@ -202,7 +225,7 @@ const DataService = {
         const rawCi3 = ci3Idx > -1 ? row[ci3Idx] : '';
         const rawCi4 = ci4Idx > -1 ? row[ci4Idx] : '';
 
-        // --- NEW: AUDIT CHECK ---
+        // --- AUDIT CHECK & FLAG ---
         let missingElements = [];
         if (rawCrnt === '') missingElements.push('CRNT');
         if (rawCi1 === '') missingElements.push('CI1');
@@ -210,10 +233,12 @@ const DataService = {
         if (rawCi3 === '') missingElements.push('CI3');
         if (rawCi4 === '') missingElements.push('CI4');
 
+        let isSubjectIncomplete = false;
+        
         if (missingElements.length > 0) {
           studentMap[adNo].auditIssues.push(`${fullSubjectName} (${missingElements.join(', ')})`);
+          isSubjectIncomplete = true;
         }
-        // ------------------------
 
         const subjectData = {
           subjectName: fullSubjectName, 
@@ -223,7 +248,8 @@ const DataService = {
           ci3: this._translate(rawCi3, 'CI', translations),
           ci4: this._translate(rawCi4, 'CI', translations),
           nextSteps1: ns1Idx > -1 ? row[ns1Idx] : '', 
-          nextSteps2: ns2Idx > -1 ? row[ns2Idx] : ''
+          nextSteps2: ns2Idx > -1 ? row[ns2Idx] : '',
+          isIncomplete: isSubjectIncomplete // Attach flag for the DataService to use later
         };
 
         studentMap[adNo].subjects.push(subjectData);
