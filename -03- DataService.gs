@@ -224,6 +224,8 @@ const DataService = {
         const rawCi2 = ci2Idx > -1 ? row[ci2Idx] : '';
         const rawCi3 = ci3Idx > -1 ? row[ci3Idx] : '';
         const rawCi4 = ci4Idx > -1 ? row[ci4Idx] : '';
+        const rawNs1 = ns1Idx > -1 ? row[ns1Idx] : '';
+        const rawNs2 = ns2Idx > -1 ? row[ns2Idx] : '';
 
         // --- AUDIT CHECK & FLAG ---
         let missingElements = [];
@@ -232,6 +234,11 @@ const DataService = {
         if (rawCi2 === '') missingElements.push('CI2');
         if (rawCi3 === '') missingElements.push('CI3');
         if (rawCi4 === '') missingElements.push('CI4');
+        
+        // Ensure at least one Next Step is provided
+        if (rawNs1 === '' && rawNs2 === '') {
+          missingElements.push('Next Steps');
+        }
 
         let isSubjectIncomplete = false;
         
@@ -247,9 +254,9 @@ const DataService = {
           ci2: this._translate(rawCi2, 'CI', translations),
           ci3: this._translate(rawCi3, 'CI', translations),
           ci4: this._translate(rawCi4, 'CI', translations),
-          nextSteps1: ns1Idx > -1 ? row[ns1Idx] : '', 
-          nextSteps2: ns2Idx > -1 ? row[ns2Idx] : '',
-          isIncomplete: isSubjectIncomplete // Attach flag for the DataService to use later
+          nextSteps1: rawNs1, 
+          nextSteps2: rawNs2,
+          isIncomplete: isSubjectIncomplete 
         };
 
         studentMap[adNo].subjects.push(subjectData);
