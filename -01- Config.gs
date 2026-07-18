@@ -71,7 +71,7 @@ const CONFIG = Object.freeze({
   REPORTS: {
     PROGRESS_REVIEW: {
       name: 'Progress Review',
-      templateId: '1mqVkM7VBjok1Hpe9KSCxpnZkkyRIRDF70dZt2zJrVUo'
+      templateId: '15H2HJM0ZBJGESEDR5JTaENjP7_KV2wa4oOM97xkuvZE'
     },
     NEXT_STEPS_SUMMARY: {
       name: 'Next Steps Summary',
