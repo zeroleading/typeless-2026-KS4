@@ -250,6 +250,8 @@ const DataService = {
         const subjectData = {
           subjectName: fullSubjectName, 
           teacher: teacherIdx > -1 ? row[teacherIdx] : '',
+          stg: rawStg,
+          crnt: rawCrnt,
           ci1: this._translate(rawCi1, 'CI', translations),
           ci2: this._translate(rawCi2, 'CI', translations),
           ci3: this._translate(rawCi3, 'CI', translations),
