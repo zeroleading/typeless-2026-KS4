@@ -5,13 +5,7 @@
 
 const DataService = {
 
-  /**
-   * Builds the main payload of student data.
-   * @param {Object} reportConfig The configuration for the current report.
-   * @param {string|null} auditAction The action to take on missing data ('drop', 'ignore', or null).
-   * @returns {Array} An array of processed student objects.
-   */
-  buildStudentDataPayload: function(reportConfig, auditAction) {
+  buildStudentDataPayload: function(reportConfig) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     
     // 1. Fetch Global Batch Values
@@ -39,32 +33,15 @@ const DataService = {
       }
     });
 
-    // 5. Convert map to array, filter based on audit action, and inject globals
-    let payload = Object.values(studentMap).map(student => {
-      let processedSubjects = student.subjects;
-      
-      // If the user requested to drop incomplete subjects, filter them out now
-      if (auditAction === 'drop') {
-        processedSubjects = processedSubjects.filter(subj => !subj.isIncomplete);
-      }
-
-      return {
-        ...student,
-        subjects: processedSubjects,
-        yearGroup: yearGroup,
-        collection: collection,
-        academicYear: academicYear,
-        shortName: shortName,
-        until: until
-      };
-    });
-
-    // 6. If the action was 'drop', remove students who now have zero subjects
-    if (auditAction === 'drop') {
-      payload = payload.filter(student => student.subjects.length > 0);
-    }
-
-    return payload;
+    // 5. Convert map to array and inject globals
+    return Object.values(studentMap).map(student => ({
+      ...student,
+      yearGroup: yearGroup,
+      collection: collection,
+      academicYear: academicYear,
+      shortName: shortName,
+      until: until
+    }));
   },
 
   _getDynamicFieldMap: function(ss) {
@@ -132,7 +109,7 @@ const DataService = {
           tutor: tutor,
           tutorInfo: {}, 
           subjects: [],
-          auditIssues: [] 
+          auditIssues: [] // <-- NEW: Array to hold our missing data warnings
         };
       }
     });
@@ -224,41 +201,29 @@ const DataService = {
         const rawCi2 = ci2Idx > -1 ? row[ci2Idx] : '';
         const rawCi3 = ci3Idx > -1 ? row[ci3Idx] : '';
         const rawCi4 = ci4Idx > -1 ? row[ci4Idx] : '';
-        const rawNs1 = ns1Idx > -1 ? row[ns1Idx] : '';
-        const rawNs2 = ns2Idx > -1 ? row[ns2Idx] : '';
 
-        // --- AUDIT CHECK & FLAG ---
+        // --- NEW: AUDIT CHECK ---
         let missingElements = [];
         if (rawCrnt === '') missingElements.push('CRNT');
         if (rawCi1 === '') missingElements.push('CI1');
         if (rawCi2 === '') missingElements.push('CI2');
         if (rawCi3 === '') missingElements.push('CI3');
         if (rawCi4 === '') missingElements.push('CI4');
-        
-        // Ensure at least one Next Step is provided
-        if (rawNs1 === '' && rawNs2 === '') {
-          missingElements.push('Next Steps');
-        }
 
-        let isSubjectIncomplete = false;
-        
         if (missingElements.length > 0) {
           studentMap[adNo].auditIssues.push(`${fullSubjectName} (${missingElements.join(', ')})`);
-          isSubjectIncomplete = true;
         }
+        // ------------------------
 
         const subjectData = {
           subjectName: fullSubjectName, 
           teacher: teacherIdx > -1 ? row[teacherIdx] : '',
-          stg: rawStg,
-          crnt: rawCrnt,
           ci1: this._translate(rawCi1, 'CI', translations),
           ci2: this._translate(rawCi2, 'CI', translations),
           ci3: this._translate(rawCi3, 'CI', translations),
           ci4: this._translate(rawCi4, 'CI', translations),
-          nextSteps1: rawNs1, 
-          nextSteps2: rawNs2,
-          isIncomplete: isSubjectIncomplete 
+          nextSteps1: ns1Idx > -1 ? row[ns1Idx] : '', 
+          nextSteps2: ns2Idx > -1 ? row[ns2Idx] : ''
         };
 
         studentMap[adNo].subjects.push(subjectData);

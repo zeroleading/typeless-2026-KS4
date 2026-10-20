@@ -17,13 +17,14 @@ function buildDynamicMenu() {
     return;
   }
 
-  const isSuperUser = CONFIG.AUTH.SUPER_USERS.includes(email);
+  const isSuperUser = CONFIG.PERMISSIONS.SUPER_USERS.includes(email);
   let menuHasItems = false;
 
   if (isSuperUser) {
     menu.addItem('Setup Subject Sheets', 'triggerSetup');
     menu.addItem('Freeze Import Data', 'triggerFreeze');
     menu.addItem('Thaw Import Data', 'triggerThaw');
+    menu.addItem('Create Copy with Permissions', 'createCopyWithPermissions');
     menu.addSeparator(); 
     menu.addItem('Run Progress Review', 'triggerProgressReview');
     menu.addItem('Run Next Steps Summary', 'triggerNextStepsSummary');
@@ -80,18 +81,17 @@ function showBatchModal(configKey, friendlyName) {
 /**
  * Called by the Modal (Step 1): Prepares the folder and audits the data.
  * @param {string} configKey The report configuration key.
- * @param {string|null} auditAction The user's choice ('drop', 'ignore', or null on first run).
+ * @param {boolean} forceProceed Whether to bypass audit warnings.
  * @returns {Object} Status payload containing issues or folder details.
  */
-function server_initBatch(configKey, auditAction) {
+function server_initBatch(configKey, forceProceed) {
   const reportConfig = CONFIG.REPORTS[configKey];
-  const payload = DataService.buildStudentDataPayload(reportConfig, auditAction);
+  const payload = DataService.buildStudentDataPayload(reportConfig);
 
   if (payload.length === 0) return { error: "No student data found." };
 
   // 1. Audit Check
-  // We only run the audit interruption if an action hasn't been explicitly selected yet
-  if (!auditAction) {
+  if (!forceProceed) {
     const studentsWithIssues = payload.filter(s => s.auditIssues && s.auditIssues.length > 0);
     if (studentsWithIssues.length > 0) {
       const issuesList = studentsWithIssues.map(s => `<b>${s.name}</b>: ${s.auditIssues.join(' | ')}`);
@@ -120,15 +120,14 @@ function server_initBatch(configKey, auditAction) {
  * @param {string} folderId The Google Drive folder ID to save to.
  * @param {number} startIndex Where to begin slicing the array.
  * @param {number} chunkSize How many students to process in this run.
- * @param {string|null} auditAction The user's action so the exact same payload is rebuilt.
  * @returns {Object} Success flag.
  */
-function server_processChunk(configKey, folderId, startIndex, chunkSize, auditAction) {
+function server_processChunk(configKey, folderId, startIndex, chunkSize) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const reportConfig = CONFIG.REPORTS[configKey];
   
-  // Re-build payload dynamically (fast and keeps memory lean) using the same filter settings
-  const payload = DataService.buildStudentDataPayload(reportConfig, auditAction);
+  // Re-build payload dynamically (fast and keeps memory lean)
+  const payload = DataService.buildStudentDataPayload(reportConfig);
   
   // Slice out just the 10 students requested
   const chunk = payload.slice(startIndex, startIndex + chunkSize);

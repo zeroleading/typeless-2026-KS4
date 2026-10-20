@@ -11,9 +11,13 @@ const CONFIG = Object.freeze({
     OUTPUT_FOLDER_ID: '18JTL77flcaOV7Us93W_hJnf3_veATeFp', 
   },
 
-  // 2. Authorisation Controls
-  AUTH: {
+  // 2. Authorisation & Access Controls
+  PERMISSIONS: {
     SUPER_USERS: [
+      'jappleton@csg.school',
+      'tnayagam@csg.school'
+    ],
+    PROTECTION_EDITORS: [
       'jappleton@csg.school',
       'tnayagam@csg.school'
     ],
@@ -71,7 +75,7 @@ const CONFIG = Object.freeze({
   REPORTS: {
     PROGRESS_REVIEW: {
       name: 'Progress Review',
-      templateId: '15H2HJM0ZBJGESEDR5JTaENjP7_KV2wa4oOM97xkuvZE'
+      templateId: '1mqVkM7VBjok1Hpe9KSCxpnZkkyRIRDF70dZt2zJrVUo'
     },
     NEXT_STEPS_SUMMARY: {
       name: 'Next Steps Summary',
