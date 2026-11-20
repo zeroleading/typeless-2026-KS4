@@ -22,7 +22,7 @@ const SheetServices = {
     console.log(`Edit detected on sheet: ${sheetName}`);
     
     // 1. Gatekeeper: Exit immediately if not a subject sheet
-    const subjectRegex = /^([A-Z][a-z]|EnL)$/;
+    const subjectRegex = /^([A-Z][a-z]|EnL|PeC)$/;
     if (!subjectRegex.test(sheetName)) {
       console.log('Exit: Sheet name does not match subject regex.');
       return;

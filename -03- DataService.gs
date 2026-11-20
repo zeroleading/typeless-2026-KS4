@@ -32,7 +32,8 @@ const DataService = {
     // 4. Process all individual Subject Sheets matching standard naming patterns
     // Subject sheets follow 2-letter codes (e.g., 'Bi', 'Ch', 'Ma') or 'EnL'.
     const allSheets = ss.getSheets();
-    const subjectRegex = /^([A-Z][a-z]|EnL)$/;
+    
+    const subjectRegex = /^([A-Z][a-z]|EnL|PeC)$/;
 
     allSheets.forEach(sheet => {
       if (subjectRegex.test(sheet.getName())) {
@@ -288,12 +289,13 @@ const DataService = {
         }
         // -----------------------------------
 
+        const isPeC = sheetName === 'PeC';
         const subjectData = {
           subjectName: fullSubjectName, 
           teacher: teacherIdx > -1 ? row[teacherIdx] : '',
-          // Attach both targets and current grades normalised via the grade formatter
-          stg: this._formatGrade(rawStg),
-          crnt: this._formatGrade(rawCrnt),
+          // Attach both targets and current grades normalised via the grade formatter (or PEC translations)
+          stg: isPeC ? this._translate(rawStg, 'PEC', translations) : this._formatGrade(rawStg),
+          crnt: isPeC ? this._translate(rawCrnt, 'PEC', translations) : this._formatGrade(rawCrnt),
           ci1: this._translate(rawCi1, 'CI', translations),
           ci2: this._translate(rawCi2, 'CI', translations),
           ci3: this._translate(rawCi3, 'CI', translations),
