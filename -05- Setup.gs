@@ -70,44 +70,67 @@ const Setup = {
     const lastCol = sheet.getLastColumn();
     const lastRow = sheet.getLastRow();
     
-    if (lastCol === 0 || lastRow < CONFIG.IMPORT.anchorRowStart) {
-      console.log("No data found in or below row 6 to freeze.");
-      return;
-    }
-
-    const anchorRange = sheet.getRange(CONFIG.IMPORT.anchorRowStart, 1, CONFIG.IMPORT.anchorRowCount, lastCol);
-    const anchorFormulas = anchorRange.getFormulas();
-    
     let foundFormulas = [];
-    
-    for (let colIndex = 0; colIndex < lastCol; colIndex++) {
-      let formula = "";
-      let rowOffset = -1;
 
-      if (anchorFormulas[0][colIndex] !== "") {
-        formula = anchorFormulas[0][colIndex];
-        rowOffset = 0;
-      } else if (anchorFormulas[1][colIndex] !== "") {
-        formula = anchorFormulas[1][colIndex];
-        rowOffset = 1;
-      }
+    if (lastCol > 0 && lastRow >= CONFIG.IMPORT.anchorRowStart) {
+      const anchorRange = sheet.getRange(CONFIG.IMPORT.anchorRowStart, 1, CONFIG.IMPORT.anchorRowCount, lastCol);
+      const anchorFormulas = anchorRange.getFormulas();
+      
+      for (let colIndex = 0; colIndex < lastCol; colIndex++) {
+        let formula = "";
+        let rowOffset = -1;
 
-      if (formula !== "") {
-        foundFormulas.push({
-          formula: formula,
-          colIndex: colIndex,
-          rowOffset: rowOffset
-        });
+        if (anchorFormulas[0][colIndex] !== "") {
+          formula = anchorFormulas[0][colIndex];
+          rowOffset = 0;
+        } else if (anchorFormulas[1][colIndex] !== "") {
+          formula = anchorFormulas[1][colIndex];
+          rowOffset = 1;
+        }
+
+        if (formula !== "") {
+          foundFormulas.push({
+            formula: formula,
+            colIndex: colIndex,
+            rowOffset: rowOffset
+          });
+        }
       }
     }
 
-    if (foundFormulas.length === 0) {
-      console.log("No formulas found in rows 6 or 7 to freeze.");
-      ss.toast("No formulas found in rows 6 or 7 to freeze.", "Typeless");
+    // Scan the access sheet dynamically from row 2 to getLastRow() across B:D
+    const accessSheet = ss.getSheetByName(CONFIG.IMPORT.accessSheetName);
+    let foundAccessFormulas = [];
+
+    if (accessSheet) {
+      const accessLastRow = accessSheet.getLastRow();
+      if (accessLastRow >= 2) {
+        const accessRange = accessSheet.getRange(2, 2, accessLastRow - 1, 3);
+        const accessValues = accessRange.getValues();
+        const accessFormulas = accessRange.getFormulas();
+
+        for (let r = 0; r < accessValues.length; r++) {
+          const colBValue = String(accessValues[r][0]).trim().toLowerCase();
+          const colDFormula = accessFormulas[r][2];
+
+          if (colBValue.startsWith('config') && colDFormula !== '') {
+            foundAccessFormulas.push({
+              row: r + 2,
+              formula: colDFormula,
+              value: accessValues[r][2]
+            });
+          }
+        }
+      }
+    }
+
+    if (foundFormulas.length === 0 && foundAccessFormulas.length === 0) {
+      console.log("No formulas found to freeze.");
+      ss.toast("No formulas found to freeze.", "Typeless");
       return;
     }
 
-    let backupData = [["Cell", "Formula", "Start Row", "Start Col", "End Col"]];
+    let backupData = [["Cell", "Formula", "Start Row", "Start Col", "End Col", "Sheet"]];
 
     for (let i = 0; i < foundFormulas.length; i++) {
       const current = foundFormulas[i];
@@ -122,7 +145,13 @@ const Setup = {
       }
 
       const cellAddress = sheet.getRange(startRow, startCol).getA1Notation();
-      backupData.push([cellAddress, "'" + current.formula, startRow, startCol, endCol]);
+      backupData.push([cellAddress, "'" + current.formula, startRow, startCol, endCol, CONFIG.IMPORT.targetSheetName]);
+    }
+
+    for (let i = 0; i < foundAccessFormulas.length; i++) {
+      const current = foundAccessFormulas[i];
+      const cellAddress = accessSheet.getRange(current.row, 4).getA1Notation();
+      backupData.push([cellAddress, "'" + current.formula, current.row, 4, 4, CONFIG.IMPORT.accessSheetName]);
     }
 
     let backupSheet = ss.getSheetByName(CONFIG.IMPORT.backupSheetName);
@@ -133,15 +162,23 @@ const Setup = {
       backupSheet.clear();
     }
     
-    backupSheet.getRange(1, 1, backupData.length, 5).setValues(backupData);
+    backupSheet.getRange(1, 1, backupData.length, 6).setValues(backupData);
     
-    const rowsToFlatten = lastRow - CONFIG.IMPORT.anchorRowStart + 1;
-    const freezeRange = sheet.getRange(CONFIG.IMPORT.anchorRowStart, 1, rowsToFlatten, lastCol);
-    freezeRange.setValues(freezeRange.getValues());
+    if (foundFormulas.length > 0) {
+      const rowsToFlatten = lastRow - CONFIG.IMPORT.anchorRowStart + 1;
+      const freezeRange = sheet.getRange(CONFIG.IMPORT.anchorRowStart, 1, rowsToFlatten, lastCol);
+      freezeRange.setValues(freezeRange.getValues());
+    }
+
+    for (let i = 0; i < foundAccessFormulas.length; i++) {
+      const current = foundAccessFormulas[i];
+      accessSheet.getRange(current.row, 4).setValue(current.value);
+    }
     
+    const totalFrozen = foundFormulas.length + foundAccessFormulas.length;
     sheet.getRange(CONFIG.IMPORT.statusCell).setValue('🥶');
-    console.log(`Successfully froze ${foundFormulas.length} formula(s).`);
-    ss.toast(`Successfully froze ${foundFormulas.length} formula(s).`, 'Typeless');
+    console.log(`Successfully froze ${totalFrozen} formula(s).`);
+    ss.toast(`Successfully froze ${totalFrozen} formula(s).`, 'Typeless');
   },
 
   /**
@@ -161,6 +198,9 @@ const Setup = {
     const backupData = backupSheet.getDataRange().getValues();
     if (backupData.length <= 1) return; 
     
+    const headers = backupData[0].map(h => String(h).trim().toLowerCase());
+    const sheetColIdx = headers.indexOf('sheet');
+    const accessSheet = ss.getSheetByName(CONFIG.IMPORT.accessSheetName);
     const maxRows = sheet.getMaxRows(); 
     let restoreCount = 0;
 
@@ -171,19 +211,30 @@ const Setup = {
       if (formulaString.startsWith("'")) {
         formulaString = formulaString.substring(1);
       }
-      
-      // Read the specific row and column bounds for this formula
-      const startRow = parseInt(backupData[i][2]);
-      const startCol = parseInt(backupData[i][3]);
-      const endCol = parseInt(backupData[i][4]);
-      const numCols = endCol - startCol + 1;
-      
-      // SURGICAL CLEAR: Now starts dynamically at Row 6 OR Row 7
-      const rowsToClear = maxRows - startRow + 1;
-      sheet.getRange(startRow, startCol, rowsToClear, numCols).clearContent();
-      
-      sheet.getRange(cellAddress).setFormula(formulaString);
-      restoreCount++;
+
+      const targetSheetName = (sheetColIdx !== -1 && backupData[i][sheetColIdx])
+        ? String(backupData[i][sheetColIdx]).trim()
+        : CONFIG.IMPORT.targetSheetName;
+
+      if (targetSheetName === CONFIG.IMPORT.accessSheetName) {
+        if (accessSheet) {
+          accessSheet.getRange(cellAddress).setFormula(formulaString);
+          restoreCount++;
+        }
+      } else {
+        // Read the specific row and column bounds for this formula
+        const startRow = parseInt(backupData[i][2]);
+        const startCol = parseInt(backupData[i][3]);
+        const endCol = parseInt(backupData[i][4]);
+        const numCols = endCol - startCol + 1;
+        
+        // SURGICAL CLEAR: Now starts dynamically at Row 6 OR Row 7
+        const rowsToClear = maxRows - startRow + 1;
+        sheet.getRange(startRow, startCol, rowsToClear, numCols).clearContent();
+        
+        sheet.getRange(cellAddress).setFormula(formulaString);
+        restoreCount++;
+      }
     }
     
     backupSheet.clear();
